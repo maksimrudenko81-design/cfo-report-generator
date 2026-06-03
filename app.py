@@ -12,7 +12,8 @@ url = st.text_input("Google Sheets CSV URL")
 if st.button("Загрузить данные"):
 
     try:
-        df = pd.read_csv(url)
+        # 🔥 ВАЖНО: устойчивое чтение CSV (фикс твоей ошибки)
+        df = pd.read_csv(url, on_bad_lines='skip', engine='python')
 
         st.success("Данные загружены")
 

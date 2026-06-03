@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="CFO Board Dashboard", layout="wide")
+st.set_page_config(page_title="CFO Панель", layout="wide")
 
-st.title("📊 CFO BOARD DASHBOARD")
+st.title("📊 CFO ПАНЕЛЬ УПРАВЛЕНИЯ")
 
 sheet_id = st.text_input("Google Sheets ID")
 
@@ -13,7 +13,7 @@ if st.button("Загрузить данные"):
 
     try:
         # =========================
-        # LOAD DATA
+        # ЗАГРУЗКА ДАННЫХ
         # =========================
         gid = "1443532418"
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
@@ -25,25 +25,27 @@ if st.button("Загрузить данные"):
         st.dataframe(df)
 
         # =========================
-        # CLEAN FUNCTION
+        # ЧИСТКА ДАННЫХ
         # =========================
         def clean(x):
             return float(str(x).replace("\u00a0", "").replace(" ", "").replace(",", "."))
 
         # =========================
-        # FIND ROWS (NO HARDCODE)
+        # ПОИСК БЛОКОВ
         # =========================
         def find_row(keyword):
             return df[df.iloc[:, 0].astype(str).str.contains(keyword, na=False)]
 
-        # Orders / Revenue
         orders_block = find_row("Общий итог").iloc[0]
         revenue_block = find_row("Общий итог").iloc[1]
 
         orders = np.array([clean(x) for x in orders_block.values[1:5]])
         revenue = np.array([clean(x) for x in revenue_block.values[1:5]])
 
-        periods = ["P1", "P2", "P3", "P4"]
+        # =========================
+        # ПЕРИОДЫ (РУССКИЕ)
+        # =========================
+        periods = ["Янв", "Фев", "Мар", "Апр"]
 
         orders_cum = np.cumsum(orders)
         revenue_cum = np.cumsum(revenue)
@@ -53,24 +55,24 @@ if st.button("Загрузить данные"):
         gap = total_orders - total_revenue
 
         # =========================
-        # KPI BLOCK
+        # KPI
         # =========================
-        st.subheader("🔴 KEY KPI")
+        st.subheader("🔴 КЛЮЧЕВЫЕ ПОКАЗАТЕЛИ")
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Отработано заказов", f"{total_orders:,.0f}")
         c2.metric("Выручка", f"{total_revenue:,.0f}")
-        c3.metric("Gap (потенциал)", f"{gap:,.0f}")
+        c3.metric("Разрыв (потенциал)", f"{gap:,.0f}")
 
         # =========================
-        # GAP CHART
+        # GAP ГРАФИК
         # =========================
-        st.subheader("📉 Orders vs Revenue (Gap View)")
+        st.subheader("📉 Динамика заказов и выручки (накопительно)")
 
         fig, ax = plt.subplots(figsize=(10, 5))
 
-        ax.plot(periods, orders_cum, marker="o", linewidth=2, label="Orders")
-        ax.plot(periods, revenue_cum, marker="s", linewidth=2, label="Revenue")
+        ax.plot(periods, orders_cum, marker="o", linewidth=2, label="Заказы")
+        ax.plot(periods, revenue_cum, marker="s", linewidth=2, label="Выручка")
 
         ax.fill_between(
             periods,
@@ -78,10 +80,12 @@ if st.button("Загрузить данные"):
             revenue_cum,
             where=(orders_cum > revenue_cum),
             alpha=0.25,
-            color="red"
+            color="red",
+            label="Разрыв"
         )
 
-        ax.set_title("Cumulative Orders vs Revenue")
+        ax.set_title("Накопительная динамика: Заказы vs Выручка")
+        ax.set_ylabel("Млн руб.")
         ax.grid(True, linestyle="--", alpha=0.3)
         ax.legend()
 
@@ -90,7 +94,7 @@ if st.button("Загрузить данные"):
         # =========================
         # PLAN VS FACT
         # =========================
-        st.subheader("📊 Plan vs Fact")
+        st.subheader("📊 План vs Факт")
 
         plan_block = find_row("нарастающим план")
         fact_block = find_row("нарастающим факт")
@@ -100,35 +104,36 @@ if st.button("Загрузить данные"):
 
         fig2, ax2 = plt.subplots(figsize=(10, 4))
 
-        ax2.bar(periods, plan, alpha=0.4, label="Plan")
-        ax2.bar(periods, fact, alpha=0.8, label="Fact")
+        ax2.bar(periods, plan, alpha=0.4, label="План")
+        ax2.bar(periods, fact, alpha=0.8, label="Факт")
 
-        ax2.set_title("Plan vs Fact (Cumulative)")
+        ax2.set_title("План vs Факт (накопительно)")
+        ax2.set_ylabel("Млн руб.")
         ax2.grid(True, axis="y", linestyle="--", alpha=0.3)
         ax2.legend()
 
         st.pyplot(fig2)
 
         # =========================
-        # BOARD INSIGHTS
+        # УПРАВЛЕНЧЕСКИЕ ВЫВОДЫ
         # =========================
-        st.subheader("🧠 Управленческие выводы")
+        st.subheader("🧠 УПРАВЛЕНЧЕСКИЕ ВЫВОДЫ")
 
         st.markdown(f"""
 **1. Финансовый разрыв:**  
-Формируется потенциальная выручка **{gap:,.0f}**, не признанная в текущем периоде.
+Формируется потенциальная выручка **{gap:,.0f}**, ещё не признанная в P&L.
 
 **2. Динамика:**  
-Наблюдается разрыв между выполнением и признанием выручки → накопление результата.
+Есть разрыв между выполнением и признанием выручки → эффект накопления результата.
 
 **3. Бизнес-модель:**  
-Основной вклад формируют крупные сервисные блоки (MICE и смежные направления).
+Рост идёт неравномерно по периодам, с сильной концентрацией в отдельных месяцах.
 
 **4. Риск:**  
-Есть асимметрия между периодами выполнения и признания → требуется контроль лагов.
+Требуется контроль лагов между выполнением и признанием выручки.
 
 **5. Вывод:**  
-Рост бизнеса идёт рывками, а не линейно — важно управлять накоплением выручки.
+Бизнес создаёт ценность быстрее, чем она отражается в выручке.
 """)
 
     except Exception as e:

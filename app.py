@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="CFO Report Generator", layout="wide")
-
 st.title("📊 CFO Report Generator")
 
 sheet_id = st.text_input("Google Sheets ID")
@@ -13,51 +12,37 @@ if st.button("Загрузить данные"):
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
         df = pd.read_csv(url)
 
-        # =========================
-        # CLEAN: убираем полностью пустые строки
-        # =========================
+        # приводим всё к строкам
         df = df.dropna(how="all")
 
-        # превращаем всё в текст для безопасного поиска
-        df_str = df.astype(str)
+        # находим пустые строки (разделители блоков)
+        empty_rows = df.isna().all(axis=1)
 
-        # =========================
-        # ИЩЕМ БЛОК 1 (защищённо)
-        # =========================
-        mask_orders = df_str.apply(lambda row: row.str.contains("отработанные", case=False, na=False)).any(axis=1)
-        mask_plan = df_str.apply(lambda row: row.str.contains("2.1", na=False)).any(axis=1)
+        split_points = list(df[empty_rows].index)
 
-        if not mask_orders.any():
-            st.error("Не найден блок 'отработанные заказы'")
-            st.dataframe(df)
-            st.stop()
+        # добавляем границы
+        blocks = []
+        start = 0
 
-        if not mask_plan.any():
-            st.error("Не найден блок '2.1'")
-            st.dataframe(df)
-            st.stop()
+        for end in split_points:
+            if end > start:
+                blocks.append(df.iloc[start:end])
+            start = end + 1
 
-        idx_orders = mask_orders[mask_orders].index[0]
-        idx_plan = mask_plan[mask_plan].index[0]
+        # последний блок
+        if start < len(df):
+            blocks.append(df.iloc[start:])
 
-        # =========================
-        # ORDERS BLOCK
-        # =========================
-        df_orders = df.iloc[idx_orders:idx_plan]
+        # =====================
+        # ВИЗУАЛИЗАЦИЯ БЛОКОВ
+        # =====================
 
-        st.subheader("📦 Отработанные заказы + выручка")
-        st.dataframe(df_orders)
+        for i, block in enumerate(blocks):
+            st.subheader(f"📦 Блок {i+1}")
+            st.dataframe(block)
 
-        # =========================
-        # PLAN BLOCK
-        # =========================
-        df_plan = df.iloc[idx_plan:]
-
-        st.subheader("📊 План / Факт")
-        st.dataframe(df_plan)
-
-        st.success("Данные разделены стабильно")
+        st.success(f"Найдено блоков: {len(blocks)}")
 
     except Exception as e:
-        st.error("Ошибка обработки")
+        st.error("Ошибка")
         st.exception(e)

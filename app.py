@@ -11,109 +11,126 @@ sheet_id = st.text_input("Google Sheets ID")
 
 if st.button("Загрузить данные"):
 
-    # =========================
-    # LOAD
-    # =========================
-    gid = "1443532418"
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    try:
+        # =========================
+        # LOAD DATA
+        # =========================
+        gid = "1443532418"
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
-    df = pd.read_csv(url)
-    df = df.dropna(how="all")
+        df = pd.read_csv(url)
+        df = df.dropna(how="all")
 
-    # =========================
-    # CORE METRICS
-    # =========================
-    orders = np.array(df.iloc[5, 1:5].astype(str).str.replace("\u00a0","").str.replace(" ",""), dtype=float)
-    revenue = np.array(df.iloc[16, 1:5].astype(str).str.replace("\u00a0","").str.replace(" ",""), dtype=float)
+        st.success("Данные загружены")
+        st.dataframe(df)
 
-    periods = ["P1","P2","P3","P4"]
+        # =========================
+        # CLEAN FUNCTION
+        # =========================
+        def clean(x):
+            return float(str(x).replace("\u00a0", "").replace(" ", "").replace(",", "."))
 
-    orders_cum = np.cumsum(orders)
-    revenue_cum = np.cumsum(revenue)
+        # =========================
+        # FIND ROWS (NO HARDCODE)
+        # =========================
+        def find_row(keyword):
+            return df[df.iloc[:, 0].astype(str).str.contains(keyword, na=False)]
 
-    total_orders = orders.sum()
-    total_revenue = revenue.sum()
-    gap = total_orders - total_revenue
+        # Orders / Revenue
+        orders_block = find_row("Общий итог").iloc[0]
+        revenue_block = find_row("Общий итог").iloc[1]
 
-    # =========================
-    # KPI BLOCK (BOARD STYLE)
-    # =========================
-    st.subheader("🔴 KEY BOARD KPI")
+        orders = np.array([clean(x) for x in orders_block.values[1:5]])
+        revenue = np.array([clean(x) for x in revenue_block.values[1:5]])
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Отработано заказов", f"{total_orders:,.0f}")
-    c2.metric("Выручка", f"{total_revenue:,.0f}")
-    c3.metric("Gap (потенциал / риск)", f"{gap:,.0f}")
+        periods = ["P1", "P2", "P3", "P4"]
 
-    # =========================
-    # GAP CHART (BOARD STYLE)
-    # =========================
-    st.subheader("📉 Orders vs Revenue (Cumulative Gap)")
+        orders_cum = np.cumsum(orders)
+        revenue_cum = np.cumsum(revenue)
 
-    fig, ax = plt.subplots(figsize=(10,5))
+        total_orders = orders.sum()
+        total_revenue = revenue.sum()
+        gap = total_orders - total_revenue
 
-    ax.plot(periods, orders_cum, label="Orders", linewidth=2)
-    ax.plot(periods, revenue_cum, label="Revenue", linewidth=2)
+        # =========================
+        # KPI BLOCK
+        # =========================
+        st.subheader("🔴 KEY KPI")
 
-    ax.fill_between(
-        periods,
-        orders_cum,
-        revenue_cum,
-        where=(orders_cum > revenue_cum),
-        alpha=0.25,
-        color="red"
-    )
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Отработано заказов", f"{total_orders:,.0f}")
+        c2.metric("Выручка", f"{total_revenue:,.0f}")
+        c3.metric("Gap (потенциал)", f"{gap:,.0f}")
 
-    ax.text(0.5, max(orders_cum.max(), revenue_cum.max())*0.95,
-            f"Total Gap: {gap:,.0f}",
-            fontsize=12, fontweight="bold")
+        # =========================
+        # GAP CHART
+        # =========================
+        st.subheader("📉 Orders vs Revenue (Gap View)")
 
-    ax.set_title("Accumulated Execution vs Revenue Recognition")
-    ax.grid(True, linestyle="--", alpha=0.3)
-    ax.legend()
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-    st.pyplot(fig)
+        ax.plot(periods, orders_cum, marker="o", linewidth=2, label="Orders")
+        ax.plot(periods, revenue_cum, marker="s", linewidth=2, label="Revenue")
 
-    # =========================
-    # PLAN VS FACT (SIMPLIFIED BOARD VIEW)
-    # =========================
-    st.subheader("📊 Plan vs Fact (Key Business Drivers)")
+        ax.fill_between(
+            periods,
+            orders_cum,
+            revenue_cum,
+            where=(orders_cum > revenue_cum),
+            alpha=0.25,
+            color="red"
+        )
 
-    # берём кусок из плана и факта (упрощённо)
-    plan = np.array(df.iloc[40, 1:5].astype(str).str.replace("\u00a0","").str.replace(" ",""), dtype=float)
-    fact = np.array(df.iloc[50, 1:5].astype(str).str.replace("\u00a0","").str.replace(" ",""), dtype=float)
+        ax.set_title("Cumulative Orders vs Revenue")
+        ax.grid(True, linestyle="--", alpha=0.3)
+        ax.legend()
 
-    labels = ["P1","P2","P3","P4"]
+        st.pyplot(fig)
 
-    fig2, ax2 = plt.subplots(figsize=(10,4))
+        # =========================
+        # PLAN VS FACT
+        # =========================
+        st.subheader("📊 Plan vs Fact")
 
-    ax2.bar(labels, plan, alpha=0.4, label="Plan")
-    ax2.bar(labels, fact, alpha=0.8, label="Fact")
+        plan_block = find_row("нарастающим план")
+        fact_block = find_row("нарастающим факт")
 
-    ax2.set_title("Plan vs Fact (Total Company)")
-    ax2.grid(True, axis="y", linestyle="--", alpha=0.3)
-    ax2.legend()
+        plan = np.array([clean(x) for x in plan_block.iloc[0].values[1:5]])
+        fact = np.array([clean(x) for x in fact_block.iloc[0].values[1:5]])
 
-    st.pyplot(fig2)
+        fig2, ax2 = plt.subplots(figsize=(10, 4))
 
-    # =========================
-    # BOARD INSIGHTS (JUDGEMENT LAYER)
-    # =========================
-    st.subheader("🧠 Управленческие выводы (Board Level)")
+        ax2.bar(periods, plan, alpha=0.4, label="Plan")
+        ax2.bar(periods, fact, alpha=0.8, label="Fact")
 
-    st.markdown(f"""
+        ax2.set_title("Plan vs Fact (Cumulative)")
+        ax2.grid(True, axis="y", linestyle="--", alpha=0.3)
+        ax2.legend()
+
+        st.pyplot(fig2)
+
+        # =========================
+        # BOARD INSIGHTS
+        # =========================
+        st.subheader("🧠 Управленческие выводы")
+
+        st.markdown(f"""
 **1. Финансовый разрыв:**  
 Формируется потенциальная выручка **{gap:,.0f}**, не признанная в текущем периоде.
 
-**2. Динамика исполнения:**  
-Наблюдается асинхронность между выполнением и признанием выручки → эффект накопления.
+**2. Динамика:**  
+Наблюдается разрыв между выполнением и признанием выручки → накопление результата.
 
-**3. Структура бизнеса:**  
-Основной объём формирует MICE-сегмент (ключевой драйвер модели).
+**3. Бизнес-модель:**  
+Основной вклад формируют крупные сервисные блоки (MICE и смежные направления).
 
-**4. Риски исполнения:**  
-Есть периодические провалы, требующие анализа (особенно в среднем горизонте).
+**4. Риск:**  
+Есть асимметрия между периодами выполнения и признания → требуется контроль лагов.
 
-**5. Управленческий вывод:**  
-Бизнес растёт не линейно — требуется управление лагом между выполнением и признанием выручки.
+**5. Вывод:**  
+Рост бизнеса идёт рывками, а не линейно — важно управлять накоплением выручки.
 """)
+
+    except Exception as e:
+        st.error("Ошибка обработки данных")
+        st.exception(e)

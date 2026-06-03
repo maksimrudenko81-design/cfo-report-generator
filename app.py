@@ -9,40 +9,22 @@ sheet_id = st.text_input("Google Sheets ID")
 if st.button("Загрузить данные"):
 
     try:
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        # 🔥 ВАЖНО: фиксируем нужный лист через gid
+        gid = "1443532418"
+
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+
         df = pd.read_csv(url)
 
-        # приводим всё к строкам
-        df = df.dropna(how="all")
+        st.success("Загружен правильный лист")
 
-        # находим пустые строки (разделители блоков)
-        empty_rows = df.isna().all(axis=1)
+        st.subheader("Preview")
+        st.dataframe(df)
 
-        split_points = list(df[empty_rows].index)
-
-        # добавляем границы
-        blocks = []
-        start = 0
-
-        for end in split_points:
-            if end > start:
-                blocks.append(df.iloc[start:end])
-            start = end + 1
-
-        # последний блок
-        if start < len(df):
-            blocks.append(df.iloc[start:])
-
-        # =====================
-        # ВИЗУАЛИЗАЦИЯ БЛОКОВ
-        # =====================
-
-        for i, block in enumerate(blocks):
-            st.subheader(f"📦 Блок {i+1}")
-            st.dataframe(block)
-
-        st.success(f"Найдено блоков: {len(blocks)}")
+        st.subheader("Базовая информация")
+        st.write("Строк:", len(df))
+        st.write("Колонки:", list(df.columns))
 
     except Exception as e:
-        st.error("Ошибка")
+        st.error("Ошибка загрузки")
         st.exception(e)

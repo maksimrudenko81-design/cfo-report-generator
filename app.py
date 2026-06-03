@@ -11,7 +11,7 @@ if st.button("Загрузить данные"):
 
     try:
         # 📥 правильный экспорт Google Sheets
-      url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=1443532418"
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=1443532418"
 
         df = pd.read_csv(url)
 

@@ -5,26 +5,36 @@ st.set_page_config(page_title="CFO Report Generator", layout="wide")
 
 st.title("📊 CFO Report Generator")
 
-st.write("Вставь CSV-ссылку на Google Sheets (лист periods или categories)")
-
-url = st.text_input("Google Sheets CSV URL")
+sheet_id = st.text_input("Google Sheets ID (не ссылка, а ID)")
 
 if st.button("Загрузить данные"):
 
     try:
-        # 🔥 ВАЖНО: устойчивое чтение CSV (фикс твоей ошибки)
-        df = pd.read_csv(url, on_bad_lines='skip', engine='python')
+        # =========================
+        # BLOCK 1: ORDERS + REVENUE
+        # =========================
+        url_orders = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&range=A2:G32"
+        df_orders = pd.read_csv(url_orders)
 
-        st.success("Данные загружены")
+        # чистим строки
+        df_orders = df_orders.dropna(how='all')
 
-        st.subheader("Preview")
-        st.dataframe(df)
+        st.subheader("Отработанные заказы / Выручка")
+        st.dataframe(df_orders)
 
-        st.subheader("Базовая статистика")
+        # =========================
+        # BLOCK 2: PLAN vs FACT
+        # =========================
+        url_plan = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&range=A36:G64"
+        df_plan = pd.read_csv(url_plan)
 
-        st.write("Строк:", len(df))
-        st.write("Колонки:", list(df.columns))
+        df_plan = df_plan.dropna(how='all')
+
+        st.subheader("План vs Факт")
+        st.dataframe(df_plan)
+
+        st.success("Данные корректно загружены")
 
     except Exception as e:
-        st.error("Ошибка загрузки данных")
+        st.error("Ошибка загрузки")
         st.exception(e)

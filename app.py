@@ -3,48 +3,80 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="CFO Панель", layout="wide")
+st.set_page_config(
+    page_title="CFO Dashboard",
+    layout="wide"
+)
 
-st.title("📊 CFO ПАНЕЛЬ УПРАВЛЕНИЯ")
+st.title("📊 CFO Dashboard")
 
-sheet_id = st.text_input("Google Sheets ID")
+sheet_id = st.text_input(
+    "Google Sheets ID",
+    value="1zAVRqUNVcmU-zFkkL3Azkir4mI4FTC41FGZSgpCuGJU"
+)
 
 if st.button("Загрузить данные"):
 
     try:
-        # =========================
-        # ЗАГРУЗКА ДАННЫХ
-        # =========================
-        gid = "1443532418"
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
-        df = pd.read_csv(url)
-        df = df.dropna(how="all")
+        gid = "1443532418"
+
+        url = (
+            f"https://docs.google.com/spreadsheets/d/"
+            f"{sheet_id}/export?format=csv&gid={gid}"
+        )
+
+        df = pd.read_csv(url, header=None)
 
         st.success("Данные загружены")
-        st.dataframe(df)
 
-        # =========================
-        # ЧИСТКА ДАННЫХ
-        # =========================
-        def clean(x):
-            return float(str(x).replace("\u00a0", "").replace(" ", "").replace(",", "."))
+        # ==================================
+        # ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
+        # ==================================
 
-        # =========================
-        # ПОИСК БЛОКОВ
-        # =========================
-        def find_row(keyword):
-            return df[df.iloc[:, 0].astype(str).str.contains(keyword, na=False)]
+        def clean_number(x):
 
-        orders_block = find_row("Общий итог").iloc[0]
-        revenue_block = find_row("Общий итог").iloc[1]
+            if pd.isna(x):
+                return 0
 
-        orders = np.array([clean(x) for x in orders_block.values[1:5]])
-        revenue = np.array([clean(x) for x in revenue_block.values[1:5]])
+            x = str(x)
 
-        # =========================
-        # ПЕРИОДЫ (РУССКИЕ)
-        # =========================
+            x = x.replace("\u00a0", "")
+            x = x.replace(" ", "")
+            x = x.replace(",", ".")
+
+            if x == "":
+                return 0
+
+            try:
+                return float(x)
+            except:
+                return 0
+
+        # ==================================
+        # БЛОК 1
+        # ОБЪЕМ ЗАКАЗОВ
+        # ==================================
+
+        orders = np.array([
+            clean_number(df.iloc[7, 1]),
+            clean_number(df.iloc[7, 2]),
+            clean_number(df.iloc[7, 3]),
+            clean_number(df.iloc[7, 4]),
+        ])
+
+        # ==================================
+        # БЛОК 2
+        # РЕАЛИЗАЦИИ
+        # ==================================
+
+        revenue = np.array([
+            clean_number(df.iloc[16, 1]),
+            clean_number(df.iloc[16, 2]),
+            clean_number(df.iloc[16, 3]),
+            clean_number(df.iloc[16, 4]),
+        ])
+
         periods = ["Янв", "Фев", "Мар", "Апр"]
 
         orders_cum = np.cumsum(orders)
@@ -54,25 +86,52 @@ if st.button("Загрузить данные"):
         total_revenue = revenue.sum()
         gap = total_orders - total_revenue
 
-        # =========================
+        # ==================================
         # KPI
-        # =========================
-        st.subheader("🔴 КЛЮЧЕВЫЕ ПОКАЗАТЕЛИ")
+        # ==================================
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Отработано заказов", f"{total_orders:,.0f}")
-        c2.metric("Выручка", f"{total_revenue:,.0f}")
-        c3.metric("Разрыв (потенциал)", f"{gap:,.0f}")
+        st.subheader("Ключевые показатели")
 
-        # =========================
-        # GAP ГРАФИК
-        # =========================
-        st.subheader("📉 Динамика заказов и выручки (накопительно)")
+        col1, col2, col3 = st.columns(3)
 
-        fig, ax = plt.subplots(figsize=(10, 5))
+        col1.metric(
+            "Объем заказов",
+            f"{total_orders:,.0f} ₽".replace(",", " ")
+        )
 
-        ax.plot(periods, orders_cum, marker="o", linewidth=2, label="Заказы")
-        ax.plot(periods, revenue_cum, marker="s", linewidth=2, label="Выручка")
+        col2.metric(
+            "Реализация",
+            f"{total_revenue:,.0f} ₽".replace(",", " ")
+        )
+
+        col3.metric(
+            "Разрыв (потенциал)",
+            f"{gap:,.0f} ₽".replace(",", " ")
+        )
+
+        # ==================================
+        # ГРАФИК 1
+        # ==================================
+
+        st.subheader("Динамика заказов и реализаций")
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        ax.plot(
+            periods,
+            orders_cum,
+            linewidth=3,
+            marker="o",
+            label="Объем заказов"
+        )
+
+        ax.plot(
+            periods,
+            revenue_cum,
+            linewidth=3,
+            marker="o",
+            label="Реализация"
+        )
 
         ax.fill_between(
             periods,
@@ -80,62 +139,111 @@ if st.button("Загрузить данные"):
             revenue_cum,
             where=(orders_cum > revenue_cum),
             alpha=0.25,
-            color="red",
             label="Разрыв"
         )
 
-        ax.set_title("Накопительная динамика: Заказы vs Выручка")
-        ax.set_ylabel("Млн руб.")
-        ax.grid(True, linestyle="--", alpha=0.3)
+        ax.set_ylabel("₽")
+        ax.grid(alpha=0.3)
+
         ax.legend()
 
         st.pyplot(fig)
 
-        # =========================
-        # PLAN VS FACT
-        # =========================
-        st.subheader("📊 План vs Факт")
+        # ==================================
+        # ПЛАН VS ФАКТ
+        # ==================================
 
-        plan_block = find_row("нарастающим план")
-        fact_block = find_row("нарастающим факт")
+        st.subheader("Выполнение плана")
 
-        plan = np.array([clean(x) for x in plan_block.iloc[0].values[1:5]])
-        fact = np.array([clean(x) for x in fact_block.iloc[0].values[1:5]])
+        plan = np.array([
+            clean_number(df.iloc[40, 1]),
+            clean_number(df.iloc[40, 2]),
+            clean_number(df.iloc[40, 3]),
+            clean_number(df.iloc[40, 4]),
+        ])
 
-        fig2, ax2 = plt.subplots(figsize=(10, 4))
+        fact = np.array([
+            clean_number(df.iloc[50, 1]),
+            clean_number(df.iloc[50, 2]),
+            clean_number(df.iloc[50, 3]),
+            clean_number(df.iloc[50, 4]),
+        ])
 
-        ax2.bar(periods, plan, alpha=0.4, label="План")
-        ax2.bar(periods, fact, alpha=0.8, label="Факт")
+        fig2, ax2 = plt.subplots(figsize=(12, 6))
 
-        ax2.set_title("План vs Факт (накопительно)")
-        ax2.set_ylabel("Млн руб.")
-        ax2.grid(True, axis="y", linestyle="--", alpha=0.3)
+        x = np.arange(len(periods))
+        width = 0.35
+
+        ax2.bar(
+            x - width / 2,
+            plan,
+            width,
+            label="План"
+        )
+
+        ax2.bar(
+            x + width / 2,
+            fact,
+            width,
+            label="Факт"
+        )
+
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(periods)
+
         ax2.legend()
 
         st.pyplot(fig2)
 
-        # =========================
+        # ==================================
+        # ВКЛАД НАПРАВЛЕНИЙ
+        # ==================================
+
+        st.subheader("Вклад направлений в реализацию")
+
+        categories = [
+            "Визы",
+            "Миграция",
+            "MICE",
+            "Билеты",
+            "Сувениры"
+        ]
+
+        values = [
+            clean_number(df.iloc[16, 6]),
+            clean_number(df.iloc[17, 6]),
+            clean_number(df.iloc[18, 6]),
+            clean_number(df.iloc[19, 6]),
+            clean_number(df.iloc[20, 6]),
+        ]
+
+        fig3, ax3 = plt.subplots(figsize=(12, 6))
+
+        ax3.barh(categories, values)
+
+        st.pyplot(fig3)
+
+        # ==================================
         # УПРАВЛЕНЧЕСКИЕ ВЫВОДЫ
-        # =========================
-        st.subheader("🧠 УПРАВЛЕНЧЕСКИЕ ВЫВОДЫ")
+        # ==================================
 
-        st.markdown(f"""
-**1. Финансовый разрыв:**  
-Формируется потенциальная выручка **{gap:,.0f}**, ещё не признанная в P&L.
+        st.subheader("Управленческие выводы")
 
-**2. Динамика:**  
-Есть разрыв между выполнением и признанием выручки → эффект накопления результата.
+        st.markdown(
+            f"""
+            • Объем заказов составил **{total_orders:,.0f} ₽**.
 
-**3. Бизнес-модель:**  
-Рост идёт неравномерно по периодам, с сильной концентрацией в отдельных месяцах.
+            • Реализация составила **{total_revenue:,.0f} ₽**.
 
-**4. Риск:**  
-Требуется контроль лагов между выполнением и признанием выручки.
+            • Разрыв между объемом заказов и реализацией составил **{gap:,.0f} ₽**.
 
-**5. Вывод:**  
-Бизнес создаёт ценность быстрее, чем она отражается в выручке.
-""")
+            • Показатель отражает различие между моментом создания заказа и моментом признания реализации.
+
+            • Для управления процессом рекомендуется контролировать динамику разрыва и скорость прохождения заказов по этапам обработки.
+            """.replace(",", " ")
+        )
 
     except Exception as e:
+
         st.error("Ошибка обработки данных")
         st.exception(e)

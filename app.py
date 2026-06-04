@@ -3,10 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.set_page_config(
-    page_title="CFO Dashboard",
-    layout="wide"
-)
+st.set_page_config(page_title="CFO Dashboard", layout="wide")
 
 st.title("📊 CFO Dashboard")
 
@@ -15,10 +12,19 @@ sheet_id = st.text_input(
     value="1zAVRqUNVcmU-zFkkL3Azkir4mI4FTC41FGZSgpCuGJU"
 )
 
+def clean(x):
+    if pd.isna(x):
+        return 0
+    x = str(x)
+    x = x.replace("\u00a0", "").replace(" ", "").replace(",", ".")
+    try:
+        return float(x)
+    except:
+        return 0
+
 if st.button("Загрузить данные"):
 
     try:
-
         gid = "1443532418"
 
         url = (
@@ -29,54 +35,22 @@ if st.button("Загрузить данные"):
         df = pd.read_csv(url, header=None)
 
         st.success("Данные загружены")
-        st.dataframe(df)
 
-        # ==================================
-        # ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
-        # ==================================
+        # =========================
+        # KPI БЛОК
+        # =========================
 
-        def clean_number(x):
+        orders = np.array([clean(df.iloc[8, 1]), clean(df.iloc[8, 2]),
+                           clean(df.iloc[8, 3]), clean(df.iloc[8, 4])])
 
-            if pd.isna(x):
-                return 0
+        revenue = np.array([clean(df.iloc[17, 1]), clean(df.iloc[17, 2]),
+                             clean(df.iloc[17, 3]), clean(df.iloc[17, 4])])
 
-            x = str(x)
+        plan = np.array([clean(df.iloc[41, 1]), clean(df.iloc[41, 2]),
+                         clean(df.iloc[41, 3]), clean(df.iloc[41, 4])])
 
-            x = x.replace("\u00a0", "")
-            x = x.replace(" ", "")
-            x = x.replace(",", ".")
-
-            if x == "":
-                return 0
-
-            try:
-                return float(x)
-            except:
-                return 0
-
-        # ==================================
-        # БЛОК 1
-        # ОБЪЕМ ЗАКАЗОВ
-        # ==================================
-
-        orders = np.array([
-            clean_number(df.iloc[7, 1]),
-            clean_number(df.iloc[7, 2]),
-            clean_number(df.iloc[7, 3]),
-            clean_number(df.iloc[7, 4]),
-        ])
-
-        # ==================================
-        # БЛОК 2
-        # РЕАЛИЗАЦИИ
-        # ==================================
-
-        revenue = np.array([
-            clean_number(df.iloc[16, 1]),
-            clean_number(df.iloc[16, 2]),
-            clean_number(df.iloc[16, 3]),
-            clean_number(df.iloc[16, 4]),
-        ])
+        fact = np.array([clean(df.iloc[51, 1]), clean(df.iloc[51, 2]),
+                         clean(df.iloc[51, 3]), clean(df.iloc[51, 4])])
 
         periods = ["Янв", "Фев", "Мар", "Апр"]
 
@@ -87,107 +61,52 @@ if st.button("Загрузить данные"):
         total_revenue = revenue.sum()
         gap = total_orders - total_revenue
 
-        # ==================================
+        # =========================
         # KPI
-        # ==================================
+        # =========================
 
-        st.subheader("Ключевые показатели")
+        st.subheader("KPI")
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric(
-            "Объем заказов",
-            f"{total_orders:,.0f} ₽".replace(",", " ")
-        )
+        col1.metric("Объем заказов", f"{total_orders:,.0f} ₽".replace(",", " "))
+        col2.metric("Реализация", f"{total_revenue:,.0f} ₽".replace(",", " "))
+        col3.metric("Разрыв (потенциал)", f"{gap:,.0f} ₽".replace(",", " "))
 
-        col2.metric(
-            "Реализация",
-            f"{total_revenue:,.0f} ₽".replace(",", " ")
-        )
-
-        col3.metric(
-            "Разрыв (потенциал)",
-            f"{gap:,.0f} ₽".replace(",", " ")
-        )
-
-        # ==================================
+        # =========================
         # ГРАФИК 1
-        # ==================================
+        # =========================
 
         st.subheader("Динамика заказов и реализаций")
 
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        ax.plot(
-            periods,
-            orders_cum,
-            linewidth=3,
-            marker="o",
-            label="Объем заказов"
-        )
+        ax.plot(periods, orders_cum, marker="o", label="Заказы")
+        ax.plot(periods, revenue_cum, marker="o", label="Реализация")
 
-        ax.plot(
-            periods,
-            revenue_cum,
-            linewidth=3,
-            marker="o",
-            label="Реализация"
-        )
-
-        ax.fill_between(
-            periods,
-            orders_cum,
-            revenue_cum,
-            where=(orders_cum > revenue_cum),
-            alpha=0.25,
-            label="Разрыв"
-        )
+        ax.fill_between(periods, orders_cum, revenue_cum,
+                        where=(orders_cum > revenue_cum),
+                        alpha=0.25, label="Разрыв")
 
         ax.set_ylabel("₽")
         ax.grid(alpha=0.3)
-
         ax.legend()
 
         st.pyplot(fig)
 
-        # ==================================
-        # ПЛАН VS ФАКТ
-        # ==================================
+        # =========================
+        # ПЛАН / ФАКТ
+        # =========================
 
-        st.subheader("Выполнение плана")
-
-        plan = np.array([
-            clean_number(df.iloc[40, 1]),
-            clean_number(df.iloc[40, 2]),
-            clean_number(df.iloc[40, 3]),
-            clean_number(df.iloc[40, 4]),
-        ])
-
-        fact = np.array([
-            clean_number(df.iloc[50, 1]),
-            clean_number(df.iloc[50, 2]),
-            clean_number(df.iloc[50, 3]),
-            clean_number(df.iloc[50, 4]),
-        ])
-
-        fig2, ax2 = plt.subplots(figsize=(12, 6))
+        st.subheader("План vs Факт")
 
         x = np.arange(len(periods))
         width = 0.35
 
-        ax2.bar(
-            x - width / 2,
-            plan,
-            width,
-            label="План"
-        )
+        fig2, ax2 = plt.subplots(figsize=(12, 6))
 
-        ax2.bar(
-            x + width / 2,
-            fact,
-            width,
-            label="Факт"
-        )
+        ax2.bar(x - width/2, plan, width, label="План")
+        ax2.bar(x + width/2, fact, width, label="Факт")
 
         ax2.set_xticks(x)
         ax2.set_xticklabels(periods)
@@ -196,55 +115,20 @@ if st.button("Загрузить данные"):
 
         st.pyplot(fig2)
 
-        # ==================================
-        # ВКЛАД НАПРАВЛЕНИЙ
-        # ==================================
+        # =========================
+        # ЛОГИКА
+        # =========================
 
-        st.subheader("Вклад направлений в реализацию")
+        st.subheader("Вывод")
 
-        categories = [
-            "Визы",
-            "Миграция",
-            "MICE",
-            "Билеты",
-            "Сувениры"
-        ]
+        st.markdown(f"""
+- Заказы: **{total_orders:,.0f} ₽**
+- Реализация: **{total_revenue:,.0f} ₽**
+- Разрыв: **{gap:,.0f} ₽**
 
-        values = [
-            clean_number(df.iloc[16, 6]),
-            clean_number(df.iloc[17, 6]),
-            clean_number(df.iloc[18, 6]),
-            clean_number(df.iloc[19, 6]),
-            clean_number(df.iloc[20, 6]),
-        ]
-
-        fig3, ax3 = plt.subplots(figsize=(12, 6))
-
-        ax3.barh(categories, values)
-
-        st.pyplot(fig3)
-
-        # ==================================
-        # УПРАВЛЕНЧЕСКИЕ ВЫВОДЫ
-        # ==================================
-
-        st.subheader("Управленческие выводы")
-
-        st.markdown(
-            f"""
-            • Объем заказов составил **{total_orders:,.0f} ₽**.
-
-            • Реализация составила **{total_revenue:,.0f} ₽**.
-
-            • Разрыв между объемом заказов и реализацией составил **{gap:,.0f} ₽**.
-
-            • Показатель отражает различие между моментом создания заказа и моментом признания реализации.
-
-            • Для управления процессом рекомендуется контролировать динамику разрыва и скорость прохождения заказов по этапам обработки.
-            """.replace(",", " ")
-        )
+Разрыв отражает не выполненные заказы, а **разницу между созданием заказа и признанием выручки**.
+""".replace(",", " "))
 
     except Exception as e:
-
-        st.error("Ошибка обработки данных")
+        st.error("Ошибка")
         st.exception(e)

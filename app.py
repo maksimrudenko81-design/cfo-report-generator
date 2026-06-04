@@ -29,6 +29,7 @@ if st.button("Загрузить данные"):
         df = pd.read_csv(url, header=None)
 
         st.success("Данные загружены")
+        st.dataframe(df)
 
         # ==================================
         # ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
